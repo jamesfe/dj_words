@@ -1,2 +1,5 @@
+arrow==0.4.4
 pytagcloud==0.3.5
+python-dateutil==2.3
+six==1.8.0
 wsgiref==0.1.2

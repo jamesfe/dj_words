@@ -1,3 +1,7 @@
+*.cfg
+.ipynb_checkpoints/
+*.ipynb
+.idea/
 .DS_Store
 *.mbox
 *.zip
