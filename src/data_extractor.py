@@ -12,24 +12,10 @@ Some ideas:
 import arrow
 import mailbox
 import os
-from operator import itemgetter
-
-
-def find_all(a_str, sub):
-    """
-    Nice function to find all substrings
-
-    :param a_str:
-    :param sub:
-    :return:
-    """
-    start = 0
-    while True:
-        start = a_str.find(sub, start)
-        if start == -1:
-            return
-        yield start
-        start += len(sub)
+from nltk.corpus import stopwords
+import nltk
+import string
+from pytz import timezone
 
 
 class ConversationData():
@@ -70,18 +56,101 @@ class ConversationData():
                 message = dict({'from': msg['From'],
                                 'date': dtime,
                                 'subject': msg['Subject']})
-                # print msg['From'], msg['Subject'], msg['Date']
-                count += 1
-                # print len(msg.get_payload())
+                # boundary = msg.get_boundary()
+                # if boundary is not None:
+                #     bounds = [m.start() for m
+                #               in re.finditer(boundary, str(msg))]
+                # else:
+                #     bounds = list()
+                # if len(bounds) > 2:
+                #     message['text'] = str(msg)[bounds[1]:bounds[2]]
+                # else:
+                #     message['text'] = None
+                pl = None
+                if msg['Subject'].find(":") == -1:
+                    finished = False
+                    pl = msg.get_payload()
+                    while finished is False:
+                        if isinstance(pl, str):
+                            finished = True
+                        elif isinstance(pl, list):
+                            pl = pl[0].get_payload()
+                        else:
+                            raise ValueError("Non-list, non-str payload?")
+                            break
+                message['text'] = self.clean_text(str(pl))
 
-                self.messages.append(message)
-        print count
+                if message['text'] is not None:
+                    self.messages.append(message)
+                    count += 1
+        # print count
         self.messages.sort(key=lambda item: item['date'])
-        for k in self.messages:
-            print k
 
+    def clean_text(self, intext):
+        """
+        clean text
+        :param intext:
+        :return:
+        """
+        intext = intext.lower()
+        exclude = set(string.punctuation)
+        intext = ''.join(ch for ch in intext if ch not in exclude)
+
+        return intext
+
+    def show_messages(self):
+        """
+        show all the messages
+        :return:
+        """
+        for msg in self.messages:
+            print msg['text']
+
+    def build_distribution(self, msgid):
+        """
+        Get a frequency distribution for a certain email
+        :param msgid:
+        :return:
+        """
+        if msgid > len(self.messages):
+            raise IndexError("Too big.  Pick a smaller index.")
+
+        word_tokens = nltk.word_tokenize(self.messages[msgid]['text'])
+        clean_words = [w for w in word_tokens
+                       if not w in stopwords.words('english')]
+        full_dist = nltk.FreqDist(clean_words)
+        return full_dist
+
+    def gather_full_dist(self):
+        """
+        figure out the most used words in this conversation
+        :return:
+        """
+        full_dist = dict()
+        for ind, msg in enumerate(self.messages):
+            dist = self.build_distribution(ind)
+            for p in dist:
+                if p in full_dist:
+                    full_dist[p] += dist[p]
+                else:
+                    full_dist[p] = dist[p]
+        return full_dist
 
 
 if __name__ == '__main__':
-    mb = ConversationData("../data/data.mbox", "./configs.cfg")
+    mb = ConversationData("../data/data2.mbox", "./configs.cfg")
     mb.get_message_list()
+
+    # mb.show_messages()
+    i = mb.gather_full_dist()
+    p = i.items()
+
+    # p.sort(key=lambda item: item[1], reverse=True)
+    # for k in p:
+    #     print k
+
+    ofile = file("outfile.txt", 'w')
+    for k in p:
+        for i in range(k[1]):
+            ofile.write(k[0] + " ")
+    ofile.close()
